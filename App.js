@@ -1,8 +1,9 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   setStatusBarNetworkActivityIndicatorVisible,
   StatusBar,
 } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,8 +11,12 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Alert,
 } from "react-native";
 import { theme } from "./colors";
+import { Feather } from "@expo/vector-icons";
+
+const STORAGE_KEY = "@toDos";
 
 export default function App() {
   const [working, setWorking] = useState(true);
@@ -20,17 +25,50 @@ export default function App() {
   const travel = () => setWorking(false);
   const work = () => setWorking(true);
   const onChangeText = (payload) => setText(payload);
+  const saveToDos = async (toSave) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch (e) {
+      //saving error
+    }
+  };
+  const loadToDos = async () => {
+    const s = await AsyncStorage.getItem(STORAGE_KEY);
+    setToDos(JSON.parse(s));
+  };
+  useEffect(() => {
+    loadToDos();
+  }, []);
   const addToDo = () => {
     if (text === "") {
       return;
     }
     // save to do
-    const newToDos = {
-      ...toDos,
-      [Date.now()]: { text, work: working },
-    };
+    const newToDos = Object.assign({}, toDos, {
+      [Date.now()]: { text, working },
+    });
+    // const newToDos = {
+    //   ...toDos,
+    //   [Date.now()]: { text, work: working },
+    // };
     setToDos(newToDos);
+    saveToDos(newToDos);
     setText("");
+  };
+  const deleteToDo = (key) => {
+    Alert.alert("Delete this list?", "Are you sure?", [
+      { text: "Cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const newToDos = { ...toDos };
+          delete newToDos[key];
+          setToDos(newToDos);
+          saveToDos(newToDos);
+        },
+      },
+    ]);
   };
   return (
     <View style={styles.container}>
@@ -39,7 +77,7 @@ export default function App() {
       <View style={styles.header}>
         <TouchableOpacity onPress={work}>
           <Text
-            style={{ ...styles.btnText, color: working ? "white" : theme.grey }}
+            style={{ ...styles.btnText, color: working ? "title" : "white" }}
           >
             Work
           </Text>
@@ -48,7 +86,7 @@ export default function App() {
           <Text
             style={{
               ...styles.btnText,
-              color: !working ? "white" : theme.grey,
+              color: !working ? "title" : "white",
             }}
           >
             Travel
@@ -65,11 +103,16 @@ export default function App() {
         style={styles.input}
       ></TextInput>
       <ScrollView>
-        {Object.keys(toDos).map((key) => (
-          <View key={key} style={styles.toDo}>
-            <Text style={styles.toDoText}>{toDos[key].text}</Text>
-          </View>
-        ))}
+        {Object.keys(toDos).map((key) =>
+          toDos[key].working === working ? (
+            <View key={key} style={styles.toDo}>
+              <Text style={styles.toDoText}>{toDos[key].text}</Text>
+              <TouchableOpacity onPress={() => deleteToDo(key)}>
+                <Feather name="check-circle" size={20} color="title" />
+              </TouchableOpacity>
+            </View>
+          ) : null
+        )}
       </ScrollView>
     </View>
   );
@@ -78,7 +121,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
+    backgroundColor: bg,
     paddingHorizontal: 20,
   },
   header: {
@@ -99,15 +142,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   toDo: {
-    backgroundColor: theme.grey,
+    backgroundColor: "white",
     marginBottom: 10,
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   toDoText: {
-    color: "white",
+    color: font,
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });
